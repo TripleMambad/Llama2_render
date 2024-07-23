@@ -1,33 +1,31 @@
-from flask import Flask, request, jsonify
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import login
 import torch
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Hugging Face API token
-API_TOKEN = "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"
-
-# Authenticate with Hugging Face API
-from huggingface_hub import login
-login(API_TOKEN)
+# Authenticate to Hugging Face
+login("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")
 
 # Load model and tokenizer
 model_name = "meta-llama/Llama-2-7b-chat-hf"
-tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=API_TOKEN)
-model = AutoModelForCausalLM.from_pretrained(model_name, use_auth_token=API_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).to("cuda")
 
-@app.route('/generate', methods=['POST'])
-def generate():
+@app.route('/generate_lesson', methods=['POST'])
+def generate_lesson():
     data = request.json
-    lesson_title = data.get("lesson_title")
-    student_class = data.get("student_class")
+    title = data.get('title', '')
+    student_class = data.get('class', '')
 
-    prompt = f"Create a lesson titled '{lesson_title}' for a class '{student_class}':"
+    prompt = f"Generate a lesson plan for the title: {title} for class: {student_class}"
 
-    inputs = tokenizer(prompt, return_tensors="pt")
-    outputs = model.generate(**inputs, max_length=1000)
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+    outputs = model.generate(inputs.input_ids, max_length=1000)
+    lesson_plan = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    return jsonify({"response": response})
+    return jsonify({"lesson_plan": lesson_plan})
 
 if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
