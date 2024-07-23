@@ -11,7 +11,7 @@ login("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")
 # Load model and tokenizer
 model_name = "meta-llama/Llama-2-7b-chat-hf"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).to("cuda")
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)  # Removed .to("cuda")
 
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
@@ -21,7 +21,7 @@ def generate_lesson():
 
     prompt = f"Generate a lesson plan for the title: {title} for class: {student_class}"
 
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+    inputs = tokenizer(prompt, return_tensors="pt")  # Removed .to("cuda")
     outputs = model.generate(inputs.input_ids, max_length=1000)
     lesson_plan = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
