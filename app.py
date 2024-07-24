@@ -1,46 +1,45 @@
+import os
 from flask import Flask, request, jsonify
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import os
-from huggingface_hub import login
+from huggingface_hub import login, HfApi, HfFolder
 
 app = Flask(__name__)
 
-# Set Hugging Face token
-hf_token = os.getenv('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')  # Use the environment variable name
-if hf_token:
-    login(token=hf_token)
-else:
-    raise ValueError("Hugging Face API token is not set. Please set the 'HF_API_TOKEN' environment variable.")
+# Set Hugging Face API token (for demonstration purposes)
+HF_API_TOKEN = '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'
 
+# Authenticate with Hugging Face
+login(HF_API_TOKEN)
+
+# Load the model and tokenizer
 model_name = "meta-llama/Llama-2-7b-chat-hf"
-
-# Load model and tokenizer
 try:
-    print("Loading model...")
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).to("cuda")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print("Model loaded successfully!")
+    model = AutoModelForCausalLM.from_pretrained(model_name)
 except Exception as e:
-    print(f"Error loading model: {e}")
-    raise
+    print(f"Error loading model or tokenizer: {e}")
+    exit(1)
 
-@app.route('/generate', methods=['POST'])
-def generate():
+@app.route('/process', methods=['POST'])
+def process():
     try:
         data = request.json
-        lesson_title = data.get('lesson_title', '')
-        student_class = data.get('student_class', '')
-        input_text = f"Lesson Title: {lesson_title}\n Class: {student_class}\n"
-        
-        inputs = tokenizer(input_text, return_tensors="pt").to("cuda")
-        outputs = model.generate(**inputs, max_length=860, temperature=0.5)
-        response = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        
-        return jsonify({"lesson_plan": response[0]})  # Return a well-structured JSON object
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        lesson_title = data.get('lesson_title')
+        student_class = data.get('student_class')
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))  # Use the PORT environment variable, default to 10000 if not set
-    app.run(host='0.0.0.0', port=port, debug=True)  # Enable debug mode for development
+        if not lesson_title or not student_class:
+            return jsonify({'error': 'Missing lesson_title or student_class in request'}), 400
+
+        # Generate a response based on the lesson_title and student_class
+        inputs = tokenizer(f"Lesson: {lesson_title}, Class: {student_class}", return_tensors="pt")
+        outputs = model.generate(inputs['input_ids'], max_length=1000, temperature=0.5)
+        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        return jsonify({'response': result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == "__main__":
+    port = int(os.getenv('PORT', 8000))  # Use PORT environment variable or default to 8000
+    app.run(host='0.0.0.0', port=port)
